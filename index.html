@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>National Patriotism</title>
+
+<!-- CONNECTED CSS (Correct Path) -->
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="#">National Patriotism</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+    <nav id="primary-nav" class="nav">
+      <a href="#mission">Mission</a>
+      <a href="#values">Values</a>
+      <a href="#symbols">Symbols</a>
+      <a href="#events">Events</a>
+      <a href="#pledge">Pledge</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <h1>Celebrate Unity, Heritage, and Civic Duty</h1>
+    <p>Resources and stories that inspire pride and responsibility.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#pledge">Make the Pledge</a>
+      <button class="btn" id="learn-more">Learn More</button>
+    </div>
+  </div>
+</section>
+
+<main>
+<section id="mission" class="section">
+  <div class="container">
+    <h2>Mission</h2>
+    <p>Promote national pride through education, community service, and cultural celebration.</p>
+  </div>
+</section>
+
+<section id="values" class="section">
+  <div class="container">
+    <h2>Core Values</h2>
+    <div class="grid cards">
+      <article class="card">
+        <h3>Unity</h3>
+        <p>Foster respect across diverse backgrounds.</p>
+      </article>
+
+      <article class="card">
+        <h3>Service</h3>
+        <p>Encourage volunteerism and civic engagement.</p>
+      </article>
+
+      <article class="card">
+        <h3>Integrity</h3>
+        <p>Uphold honesty and responsibility.</p>
+      </article>
+
+      <article class="card">
+        <h3>Heritage</h3>
+        <p>Preserve language, art, and tradition.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="symbols" class="section">
+  <div class="container">
+    <h2>National Symbols</h2>
+
+    <div class="grid gallery">
+      <figure>
+        <img src="assets/images/flag.jpg" alt="National flag">
+        <figcaption>Flag</figcaption>
+      </figure>
+
+      <figure>
+        <img src="assets/images/emblem.jpg" alt="National emblem">
+        <figcaption>Emblem</figcaption>
+      </figure>
+
+      <figure>
+        <img src="assets/images/anthem.jpg" alt="Anthem">
+        <figcaption>Anthem</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="events" class="section">
+  <div class="container">
+    <h2>Upcoming Events</h2>
+
+    <div class="filters">
+      <button class="chip" data-filter="all">All</button>
+      <button class="chip" data-filter="education">Education</button>
+      <button class="chip" data-filter="service">Service</button>
+      <button class="chip" data-filter="culture">Culture</button>
+    </div>
+
+    <ul class="event-list">
+      <li class="event" data-category="education">
+        <strong>Civic Education Workshop</strong>
+        <span>Jan 20</span>
+      </li>
+
+      <li class="event" data-category="service">
+        <strong>Community Cleanup Day</strong>
+        <span>Feb 10</span>
+      </li>
+
+      <li class="event" data-category="culture">
+        <strong>Heritage Festival</strong>
+        <span>Mar 15</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section id="pledge" class="section">
+  <div class="container">
+    <h2>Patriotism Pledge</h2>
+    <p>I pledge to serve my community, respect our diversity, and uphold the values that strengthen our nation.</p>
+
+    <button class="btn primary" id="record-pledge">Record My Pledge</button>
+    <p id="pledge-status"></p>
+  </div>
+</section>
+
+<section id="contact" class="section">
+  <div class="container">
+    <h2>Contact</h2>
+
+    <form id="contact-form">
+      <div class="form-row">
+        <label for="name">Name</label>
+        <input id="name" name="name" required>
+      </div>
+
+      <div class="form-row">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+      </div>
+
+      <div class="form-row">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+      </div>
+
+      <button class="btn primary" type="submit">Send</button>
+      <p id="contact-status"></p>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>© National Patriotism Initiative</p>
+  </div>
+</footer>
+
+<!-- CONNECTED JAVASCRIPT -->
+<script src="app.js"></script>
+
+</body>
+</html>

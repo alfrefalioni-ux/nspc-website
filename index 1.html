@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NATIONAL SECRETARIAT FOR PATRIOTIMS CORPS NSPS STATE HOUSE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="description" content="Alumni registration, staff profiles, and leave management portal" />
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter','ui-sans-serif','system-ui','sans-serif']
+            },
+            colors: {
+              primary: {
+                50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa',
+                500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a'
+              },
+              secondary: {
+                50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa',
+                500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95'
+              },
+              accent: {
+                50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24',
+                500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f'
+              },
+              army: {
+                50: '#f5f7f0',
+                100: '#e6ead9',
+                200: '#cbd1b3',
+                300: '#aab487',
+                400: '#889762',
+                500: '#62743c',
+                600: '#4B5320',
+                700: '#3F4720',
+                800: '#2F3A16',
+                900: '#21280F'
+              }
+            },
+            keyframes: {
+              fly: {
+                '0%': { transform: 'translateX(-15%) translateY(0)' },
+                '50%': { transform: 'translateX(50%) translateY(-8%)' },
+                '100%': { transform: 'translateX(120%) translateY(0)' }
+              }
+            },
+            animation: {
+              fly: 'fly 12s linear infinite',
+              spinSlow: 'spin 12s linear infinite'
+            }
+          }
+        }
+      }
+    </script>
+    <!-- React via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-army-50 to-army-100 text-slate-900 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+
+      // Simple hash-based router
+      function useRoute() {
+        const [route, setRoute] = useState(() => location.hash.replace(/^#/, '') || '/');
+        useEffect(() => {
+          const onHash = () => setRoute(location.hash.replace(/^#/, '') || '/');
+          window.addEventListener('hashchange', onHash);
+          return () => window.removeEventListener('hashchange', onHash);
+        }, []);
+        return [route, (to) => { location.hash = to; }];
+      }
+      function Link({ to, className = '', children }) {
+        return <a href={`#${to}`} className={className}>{children}</a>;
+      }
+
+      // Storage helpers
+      const storage = {
+        get(key, fallback = []) {
+          try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+        },
+        set(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
+      };
+      function avatar(text) {
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='100%' height='100%' fill='#62743c'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='28' fill='white' font-family='Inter, Arial, sans-serif'>${text}</text></svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+      }
+
+      const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+      const download = (filename, mime, content) => {
+        const a = document.createElement('a');
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      };
+      const toCSV = (rows, cols) => {
+        const esc = (v) => '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"';
+        const header = cols.join(',');
+        const body = rows.map(r => cols.map(c => esc(r[c])).join(',')).join('\n');
+        return header + '\n' + body;
+      };
+      const fileToDataURL = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Layout components
+      function Header() {
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const logout = () => { localStorage.setItem('isAdmin', 'false'); location.hash = '/'; };
+        return (
+          <header className="sticky top-0 z-10 shadow relative overflow-hidden">
+            <div className="bg-blue-900">
+              <div className="mx-auto max-w-6xl px-4 py-2 flex items-center justify-between text-white text-sm">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1 text-accent-500"><span>📧</span><span>secretary@op.go.ug</span></div>
+                  <div className="flex items-center gap-1 text-accent-500"><span>☎</span><span>0414254881/6; 0414343926</span></div>
+                </div>
+                <a href="#" className="flex items-center gap-1 text-accent-500">Webmail</a>
+              </div>
+            </div>
+            <div className="bg-white">
+              <div className="mx-auto max-w-6xl px-4 py-2 grid grid-cols-3 items-center">
+                <Link to="/" className="flex items-center gap-3 text-white">
+            
+                </Link>
+                <div className="col-span-2 text-left text-slate-900 overflow-hidden whitespace-nowrap text-ellipsis">
+                  <div className="font-semibold">NATIONAL SECRETARIAT FOR PATRIOTIMS CORPS NSPS STATE HOUSE</div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <a href="https://twitter.com" target="_blank" rel="noopener" className="p-1 rounded hover:bg-slate-100"><img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="Twitter" className="h-5 w-5" /></a>
+                  <a href="https://www.youtube.com" target="_blank" rel="noopener" className="p-1 rounded hover:bg-slate-100"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" alt="YouTube" className="h-5 w-16" /></a>
+                  <a href="https://www.whatsapp.com" target="_blank" rel="noopener" className="p-1 rounded hover:bg-slate-100"><img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" className="h-5 w-5" /></a>
+                  <a href="https://www.facebook.com" target="_blank" rel="noopener" className="p-1 rounded hover:bg-slate-100"><img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg" alt="Facebook" className="h-5 w-5" /></a>
+                  
+                </div>
+              </div>
+            </div>
+            <div className="bg-white">
+              <div className="mx-auto max-w-6xl px-4 py-2 flex items-center justify-between">
+                <nav className="flex items-center gap-2">
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/">Home</Link>
+                  {isAdmin && <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/alumni/register">Alumni Register</Link>}
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/alumni/list">Alumni List</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/projects">Projects</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/staff">Staff Directory</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/leave">Leave</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/gallery">Gallery</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/news">News</Link>
+                  <Link className="px-3 py-2 rounded text-slate-800 hover:text-accent-600" to="/leadership">Leadership</Link>
+                </nav>
+                {!isAdmin ? (
+                  <Link className="px-3 py-2 rounded bg-accent-600 text-white hover:bg-accent-700" to="/admin">Admin Login</Link>
+                ) : (
+                  <button onClick={logout} className="px-3 py-2 rounded border text-slate-800 hover:bg-slate-50">Logout</button>
+                )}
+              </div>
+            </div>
+            <div className="w-full grid grid-cols-3">
+              <div className="h-1.5 bg-black"></div>
+              <div className="h-1.5 bg-yellow-500"></div>
+              <div className="h-1.5 bg-red-600"></div>
+            </div>
+          </header>
+        );
+      }
+
+      function Page({ title, children, actions }) {
+        return (
+          <div className="mx-auto max-w-6xl px-4 py-6">
+            <div className="flex items-center justify-between mb-4">
+              {title === 'Dashboard' ? (
+                <Link to="/" className="text-xl sm:text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-secondary-600 hover:from-primary-600 hover:to-secondary-700">{title}</Link>
+              ) : (
+                <h1 className="text-xl sm:text-2xl font-semibold text-army-800">{title}</h1>
+              )}
+              {actions}
+            </div>
+            <div className="rounded-lg border bg-white p-4 shadow-sm">
+              {children}
+            </div>
+          </div>
+        );
+      }
+
+      // Dashboard
+      function Home() {
+        const [alumni, setAlumni] = useState([]);
+        const [staff, setStaff] = useState([]);
+        const [requests, setRequests] = useState([]);
+        const [gallery, setGallery] = useState([]);
+        const [news, setNews] = useState([]);
+        const heroImages = [
+          'https://picsum.photos/id/1015/1200/400',
+          'https://picsum.photos/id/1018/1200/400',
+          'https://picsum.photos/id/1021/1200/400'
+        ];
+        const [hero, setHero] = useState(heroImages[0]);
+        const [feedback, setFeedback] = useState([]);
+        const [mgmtPhoto, setMgmtPhoto] = useState('');
+        const [fbText, setFbText] = useState('');
+        const [opportunities, setOpportunities] = useState([]);
+        const [projects, setProjects] = useState([]);
+        const [newOpp, setNewOpp] = useState({ label: '', url: '' });
+        const [newProj, setNewProj] = useState({ label: '', url: '' });
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        useEffect(() => {
+          setAlumni(storage.get('alumniRecords'));
+          setStaff(storage.get('staffRecords'));
+          setRequests(storage.get('leaveRequests'));
+          setGallery(storage.get('galleryItems'));
+          setNews(storage.get('newsItems'));
+          setFeedback(storage.get('feedbackMessages'));
+          setMgmtPhoto(storage.get('managementPhoto'));
+          setOpportunities(storage.get('opportunityLinks'));
+          setProjects(storage.get('projectLinks'));
+        }, []);
+        useEffect(() => {
+          let i = 0;
+          const t = setInterval(() => { i = (i + 1) % heroImages.length; setHero(heroImages[i]); }, 10000);
+          return () => clearInterval(t);
+        }, []);
+        const latest = (arr) => arr.slice(-4).reverse();
+        const Stat = ({ label, value, to, emoji }) => (
+          <Link to={to} className="rounded-lg p-4 bg-gradient-to-br from-army-50 to-white border border-army-100 hover:shadow-lg transition-transform transform hover:-translate-y-0.5">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">{label}</div>
+              <div className="text-xl" aria-hidden>{emoji}</div>
+            </div>
+            <div className="text-2xl font-semibold text-army-800">{value}</div>
+          </Link>
+        );
+        const sendFeedback = (e) => {
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
+          if (!fbText.trim()) return;
+          const next = [...feedback, { id: uid(), text: fbText.trim(), from: isAdmin ? 'admin' : 'user', createdAt: new Date().toISOString() }];
+          setFeedback(next); storage.set('feedbackMessages', next); setFbText('');
+        };
+        const ministryLinks = [
+          { label: 'Ministry of Defence', url: 'https://www.modva.go.ug' },
+          { label: 'Ministry of Tourism', url: 'https://www.motwa.go.ug' },
+          { label: 'Ministry of Finance', url: 'https://www.finance.go.ug' },
+          { label: 'Ministry of Health', url: 'https://www.health.go.ug' },
+          { label: 'Ministry of Education', url: 'https://www.education.go.ug' },
+          { label: 'Ministry of Foreign Affairs', url: 'https://www.mofa.go.ug' }
+        ];
+        return (
+          <Page title="Dashboard" actions={<Link className="px-3 py-2 rounded border hover:bg-slate-50" to="/alumni/list">View All Alumni</Link>}>
+            <div className="rounded-lg shadow mb-4 h-36 sm:h-48 md:h-56 relative overflow-hidden" style={{ backgroundImage: `url(${hero})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/20"></div>
+              <div className="relative p-6 text-white">
+                <div className="text-2xl font-semibold">NATIONAL SECRETARIAT FOR PATRIOTIMS CORPS</div>
+                <div className="text-sm mt-1">Building unity, service and national development</div>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="rounded-lg border bg-white p-4 shadow-sm hover:shadow-md transition">
+                <div className="font-medium mb-2">Introduction</div>
+                <div className="text-sm text-gray-700">NSPC leads patriotic initiatives across the nation, fostering unity, service and development through youth engagement, alumni networks and public service partnerships.</div>
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm hover:shadow-md transition">
+                <div className="font-medium mb-2">Message from Management</div>
+                <div className="flex items-start gap-3">
+                  <img src={mgmtPhoto || avatar('NSPC')} alt="Management Photo" className="h-12 w-12 rounded-full object-cover" />
+                  <div>
+                    <div className="font-medium">Management</div>
+                    <div className="text-sm text-gray-700">Together we build a patriotic nation grounded in values, discipline and service. Your participation strengthens our national fabric.</div>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium mb-1">Update management photo</label>
+                    <input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const url = await fileToDataURL(f); setMgmtPhoto(url); storage.set('managementPhoto', url); }} />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-white p-4 shadow-sm mb-4">
+              <div className="font-medium mb-2">Connect Patriots</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <a href="#" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Patriotism Website</a>
+                <a href="https://www.updf.go.ug" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Uganda Peoples Defence Forces (UPDF)</a>
+                <a href="https://www.ura.go.ug" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Uganda Revenue Authority (URA)</a>
+                <a href="https://www.ucc.co.ug" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Uganda Communications Commission (UCC)</a>
+                <a href="https://www.modva.go.ug" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Ministry of Defence</a>
+                <a href="https://www.motwa.go.ug" target="_blank" rel="noopener" className="px-3 py-2 rounded border hover:bg-slate-50">Ministry of Tourism</a>
+              </div>
+              <div className="mt-3">
+                <label className="block text-sm font-medium mb-1">Useful Ministries</label>
+                <select className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" onChange={e => { const url = e.target.value; if (url) window.open(url, '_blank', 'noopener'); }}>
+                  <option value="">Select a ministry…</option>
+                  {ministryLinks.map(m => (<option key={m.url} value={m.url}>{m.label}</option>))}
+                </select>
+              </div>
+            </div>
+            
+            
+            <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+              <Stat label="Alumni" value={alumni.length} to="/alumni/list" emoji="🎓" />
+              <Stat label="Staff" value={staff.length} to="/staff" emoji="👥" />
+              <Stat label="Leave Requests" value={requests.length} to="/leave" emoji="🗓️" />
+              <Stat label="News" value={news.length} to="/news" emoji="📰" />
+              <Stat label="Gallery" value={gallery.length} to="/gallery" emoji="🖼️" />
+            </div>
+            
+            
+            <div className="grid lg:grid-cols-2 gap-4">
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">Recent Alumni</div>
+                  <Link to="/alumni/list" className="text-sm text-primary-700 hover:underline">View all</Link>
+                </div>
+                {alumni.length === 0 ? (
+                  <Empty title="No alumni yet" subtitle="Register alumni to see them here." />
+                ) : (
+                  <ul className="divide-y text-sm">
+                    {latest(alumni).map(a => (
+                      <li key={a.id} className="py-2">
+                        <div className="font-medium">{a.name}</div>
+                        <div className="text-gray-600">{a.institution || '—'} • {a.district || '—'}</div>
+                        <div className="text-gray-600">Passout: {a.passoutDate || '—'}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">Recent News</div>
+                  <Link to="/news" className="text-sm text-primary-700 hover:underline">View all</Link>
+                </div>
+                {news.length === 0 ? (
+                  <Empty title="No news" subtitle="Add news to see them here." />
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {latest(news).map(n => (
+                      <div key={n.id} className="group rounded overflow-hidden border hover:shadow-md transition">
+                        <img src={n.img} alt={n.title} className="h-24 w-full object-cover transform transition-transform duration-300 group-hover:scale-105" />
+                        <div className="p-2 text-sm">
+                          <div className="font-medium">{n.title}</div>
+                          <div className="text-gray-600">{n.date}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">Gallery</div>
+                  <Link to="/gallery" className="text-sm text-primary-700 hover:underline">View all</Link>
+                </div>
+                {gallery.length === 0 ? (
+                  <Empty title="No images" subtitle="Add images to see them here." />
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {latest(gallery).map(g => (
+                      <img key={g.id} src={g.src} alt={g.title} className="h-16 w-full object-cover rounded transform transition-transform duration-200 hover:scale-105" />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">Recent Leave Requests</div>
+                  <Link to="/leave" className="text-sm text-primary-700 hover:underline">Open</Link>
+                </div>
+                {requests.length === 0 ? (
+                  <Empty title="No leave requests" subtitle="Submit leave requests to see them here." />
+                ) : (
+                  <ul className="divide-y text-sm">
+                    {latest(requests).map(r => (
+                      <li key={r.id} className="py-2 flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{r.type}</div>
+                          <div className="text-gray-600">{r.startDate} → {r.endDate}</div>
+                        </div>
+                        <StatusBadge status={r.status} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </Page>
+        );
+      }
+
+      function Card({ title, desc, action }) {
+        return (
+          <div className="rounded-lg border border-slate-200 p-4 bg-white shadow-sm">
+            <div className="font-medium mb-1">{title}</div>
+            <div className="text-sm text-gray-600 mb-3">{desc}</div>
+            <div>
+              {action}
+            </div>
+          </div>
+        );
+      }
+
+      // Alumni Registration
+      function AlumniRegister() {
+        const navigate = (to) => { location.hash = to; };
+        const [form, setForm] = useState({
+          name: '', gender: '', institution: '', district: '', contact: '', passoutDate: ''
+        });
+        const [errors, setErrors] = useState({});
+
+        const validate = () => {
+          const e = {};
+          if (!form.name.trim()) e.name = 'Name is required';
+          if (!form.gender) e.gender = 'Gender is required';
+          if (!form.institution.trim()) e.institution = 'Institution is required';
+          if (!form.district.trim()) e.district = 'District is required';
+          if (!form.contact.trim()) e.contact = 'Contact is required';
+          if (!form.passoutDate) e.passoutDate = 'Passout date is required';
+          return e;
+        };
+
+        const submit = (ev) => {
+          ev.preventDefault();
+          const e = validate();
+          setErrors(e);
+          if (Object.keys(e).length) return;
+          const alumni = storage.get('alumniRecords');
+          alumni.push({ id: uid(), ...form, createdAt: new Date().toISOString() });
+          storage.set('alumniRecords', alumni);
+          navigate('/alumni/list');
+        };
+
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name.replace(/([A-Z])/g, ' $1')}</label>
+            <input id={name} type={type} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className={`w-full rounded border px-3 py-2 ${errors[name] ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500`} />
+            {errors[name] && <p className="text-xs text-red-600 mt-1">{errors[name]}</p>}
+          </div>
+        );
+        const select = (name, options) => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name.replace(/([A-Z])/g, ' $1')}</label>
+            <select id={name} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                    className={`w-full rounded border px-3 py-2 ${errors[name] ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500`}>
+              <option value="">Select</option>
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {errors[name] && <p className="text-xs text-red-600 mt-1">{errors[name]}</p>}
+          </div>
+        );
+
+        return (
+          <Page title="Alumni Registration" actions={<Link className="px-3 py-2 rounded border hover:bg-slate-50" to="/alumni/list">View All Alumni</Link>}>
+            <form className="grid sm:grid-cols-2 gap-4" onSubmit={submit}>
+              {input('name', 'text', 'Jane Doe')}
+              {select('gender', ['Male','Female','Other'])}
+              {input('institution', 'text', 'University of Ghana')}
+              {input('district', 'text', 'Greater Accra')}
+              {input('contact', 'text', '+233 200 000 000')}
+              {input('passoutDate', 'date', '')}
+              <div className="sm:col-span-2 flex gap-2 justify-end">
+                <Link to="/" className="px-4 py-2 rounded border border-slate-300 hover:bg-slate-50">Cancel</Link>
+                <button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Submit</button>
+              </div>
+            </form>
+          </Page>
+        );
+      }
+
+      function AlumniList() {
+        const [list, setList] = useState([]);
+        const [query, setQuery] = useState('');
+        useEffect(() => { setList(storage.get('alumniRecords')); }, []);
+        const remove = (id) => {
+          const next = list.filter(a => a.id !== id);
+          setList(next); storage.set('alumniRecords', next);
+        };
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const exportJSON = () => {
+          download('alumni.json', 'application/json', JSON.stringify(list, null, 2));
+        };
+        const exportCSV = () => {
+          const cols = ['id','name','gender','institution','district','contact','passoutDate','createdAt'];
+          const csv = toCSV(list, cols);
+          download('alumni.csv', 'text/csv', csv);
+        };
+        const onImport = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const text = await file.text();
+          const data = JSON.parse(text);
+          setList(data);
+          storage.set('alumniRecords', data);
+          e.target.value = '';
+        };
+        const filtered = useMemo(() => {
+          const q = query.trim().toLowerCase();
+          if (!q) return list;
+          return list.filter(a => [a.name, a.gender, a.institution, a.district, a.contact].some(v => String(v || '').toLowerCase().includes(q)));
+        }, [list, query]);
+        return (
+          <Page title="Alumni List" actions={
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search alumni…" className="pl-9 w-64 rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">🔎</span>
+              </div>
+              {isAdmin && <Link className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700" to="/alumni/register">Add Alumni</Link>}
+              <button onClick={exportJSON} className="px-3 py-2 rounded border hover:bg-slate-50">Export JSON</button>
+              <button onClick={exportCSV} className="px-3 py-2 rounded border hover:bg-slate-50">Export CSV</button>
+              <label className="px-3 py-2 rounded border cursor-pointer hover:bg-slate-50" title="Import JSON file">
+                Import JSON
+                <input type="file" accept="application/json,.json" className="hidden" onChange={onImport} />
+              </label>
+              {!isAdmin && <Link className="px-3 py-2 rounded border hover:bg-white/10" to="/admin">Login to add/delete</Link>}
+            </div>
+          }>
+            {list.length === 0 ? (
+              <Empty title="No alumni yet" subtitle="Use the Register form to add alumni records." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-100 text-left">
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Gender</th>
+                      <th className="p-2">Institution</th>
+                      <th className="p-2">District</th>
+                      <th className="p-2">Contact</th>
+                      <th className="p-2">Passout Date</th>
+                      <th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(a => (
+                      <tr key={a.id} className="border-t">
+                        <td className="p-2">{a.name}</td>
+                        <td className="p-2">{a.gender || '—'}</td>
+                        <td className="p-2">{a.institution || '—'}</td>
+                        <td className="p-2">{a.district || '—'}</td>
+                        <td className="p-2">{a.contact || '—'}</td>
+                        <td className="p-2">{a.passoutDate || '—'}</td>
+                        <td className="p-2 text-right">{isAdmin && <button onClick={() => remove(a.id)} className="text-red-600 hover:underline">Delete</button>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Page>
+        );
+      }
+
+      function Empty({ title, subtitle }) {
+        return (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">🙂</div>
+            <div className="font-medium">{title}</div>
+            <div className="text-sm text-gray-600">{subtitle}</div>
+          </div>
+        );
+      }
+
+      function GalleryPage() {
+        const [items, setItems] = useState([]);
+        const [query, setQuery] = useState('');
+        const [form, setForm] = useState({ title: '', src: '' });
+        useEffect(() => { setItems(storage.get('galleryItems')); }, []);
+        const add = async (e) => {
+          e.preventDefault();
+          const next = [...items, { id: uid(), ...form }];
+          setItems(next); storage.set('galleryItems', next); setForm({ title: '', src: '' });
+        };
+        const onFile = async (ev) => {
+          const file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          const url = await fileToDataURL(file);
+          setForm({ ...form, src: url });
+        };
+        const remove = (id) => {
+          const next = items.filter(i => i.id !== id);
+          setItems(next); storage.set('galleryItems', next);
+        };
+        const exportJSON = () => download('gallery.json', 'application/json', JSON.stringify(items, null, 2));
+        const exportCSV = () => download('gallery.csv', 'text/csv', toCSV(items, ['id','title','src']));
+        const onImport = async (e) => {
+          const file = e.target.files && e.target.files[0]; if (!file) return; const text = await file.text();
+          const data = JSON.parse(text); setItems(data); storage.set('galleryItems', data); e.target.value = '';
+        };
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name}</label>
+            <input id={name} type={type} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+          </div>
+        );
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const filtered = useMemo(() => {
+          const q = query.trim().toLowerCase();
+          if (!q) return items;
+          return items.filter(i => [i.title].some(v => String(v || '').toLowerCase().includes(q)));
+        }, [items, query]);
+        return (
+          <Page title="Gallery" actions={<div className="relative"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search gallery…" className="pl-9 w-64 rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" /><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">🔎</span></div>}>
+            {isAdmin ? (
+            <form className="grid sm:grid-cols-3 gap-3 mb-4" onSubmit={add}>
+              {input('title','text','Event')}
+              <div>
+                <label className="block text-sm font-medium mb-1">Image</label>
+                <input type="file" accept="image/*" onChange={onFile} className="w-full" />
+              </div>
+              <div className="flex items-end justify-end"><button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Add</button></div>
+            </form>
+            ) : (
+              <div className="text-sm text-gray-700 mb-4">Admin access required to add or remove gallery items.</div>
+            )}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map(img => (
+                <div key={img.id} className="group rounded overflow-hidden bg-white border shadow-sm hover:shadow-md transition">
+                  <img src={img.src} alt={img.title} className="h-40 w-full object-cover transform transition-transform duration-300 group-hover:scale-105" />
+                  <div className="p-3 flex items-center justify-between">
+                    <div className="font-medium">{img.title}</div>
+                    {isAdmin && <button onClick={() => remove(img.id)} className="px-3 py-1 rounded border border-red-500 text-red-600 hover:bg-red-50">Delete</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Page>
+        );
+      }
+
+      function NewsPage() {
+        const [items, setItems] = useState([]);
+        const [query, setQuery] = useState('');
+        const [form, setForm] = useState({ title: '', date: '', img: '', excerpt: '' });
+        useEffect(() => { setItems(storage.get('newsItems')); }, []);
+        const add = async (e) => {
+          e.preventDefault();
+          const next = [...items, { id: uid(), ...form }];
+          setItems(next); storage.set('newsItems', next); setForm({ title: '', date: '', img: '', excerpt: '' });
+        };
+        const onFile = async (ev) => {
+          const file = ev.target.files && ev.target.files[0]; if (!file) return; const url = await fileToDataURL(file);
+          setForm({ ...form, img: url });
+        };
+        const remove = (id) => {
+          const next = items.filter(i => i.id !== id);
+          setItems(next); storage.set('newsItems', next);
+        };
+        const exportJSON = () => download('news.json', 'application/json', JSON.stringify(items, null, 2));
+        const exportCSV = () => download('news.csv', 'text/csv', toCSV(items, ['id','title','date','excerpt','img']));
+        const onImport = async (e) => { const file = e.target.files && e.target.files[0]; if (!file) return; const text = await file.text(); const data = JSON.parse(text); setItems(data); storage.set('newsItems', data); e.target.value = ''; };
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name}</label>
+            <input id={name} type={type} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+          </div>
+        );
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const filtered = useMemo(() => {
+          const q = query.trim().toLowerCase();
+          if (!q) return items;
+          return items.filter(n => [n.title, n.excerpt, n.date].some(v => String(v || '').toLowerCase().includes(q)));
+        }, [items, query]);
+        return (
+          <Page title="News & Events" actions={<div className="relative"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search news…" className="pl-9 w-64 rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" /><span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">🔎</span></div>}>
+            {isAdmin ? (
+            <form className="grid sm:grid-cols-3 gap-3 mb-4" onSubmit={add}>
+              {input('title','text','Event')}
+              {input('date','date','')}
+              {input('excerpt','text','Summary')}
+              <div className="sm:col-span-3">
+                <label className="block text-sm font-medium mb-1">Image</label>
+                <input type="file" accept="image/*" onChange={onFile} className="w-full" />
+              </div>
+              <div className="sm:col-span-3 flex justify-end"><button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Add</button></div>
+            </form>
+            ) : (
+              <div className="text-sm text-gray-700 mb-4">Admin access required to add or remove news items.</div>
+            )}
+            
+            <div className="grid md:grid-cols-3 gap-4">
+              {filtered.map(n => (
+                <div key={n.id} className="group rounded overflow-hidden bg-white border shadow-sm hover:shadow-md transition">
+                  <img src={n.img} alt={n.title} className="h-40 w-full object-cover transform transition-transform duration-300 group-hover:scale-105" />
+                  <div className="p-3">
+                    <div className="font-medium">{n.title}</div>
+                    <div className="text-sm text-gray-600">{n.date}</div>
+                    <div className="text-sm text-gray-700 mt-1">{n.excerpt}</div>
+                    {isAdmin && <div className="mt-2"><button onClick={() => remove(n.id)} className="px-3 py-1 rounded border border-red-500 text-red-600 hover:bg-red-50">Delete</button></div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Page>
+        );
+      }
+
+      function LeadershipPage() {
+        const [list, setList] = useState([]);
+        const [form, setForm] = useState({ name: '', position: '', photoUrl: '' });
+        useEffect(() => { setList(storage.get('leadershipRecords')); }, []);
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const submit = (e) => {
+          e.preventDefault();
+          const next = [...list, { id: uid(), ...form }];
+          setList(next); storage.set('leadershipRecords', next); setForm({ name: '', position: '', photoUrl: '' });
+        };
+        const remove = (id) => {
+          const next = list.filter(x => x.id !== id);
+          setList(next); storage.set('leadershipRecords', next);
+        };
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name}</label>
+            <input id={name} type={type} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+          </div>
+        );
+        return (
+          <Page title="Leadership">
+            {isAdmin ? (
+            <form className="grid sm:grid-cols-3 gap-4 mb-4" onSubmit={submit}>
+              {input('name','text','Jane Doe')}
+              {input('position','text','President')}
+              <div>
+                <label className="block text-sm font-medium mb-1">Photo</label>
+                <input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const url = await fileToDataURL(f); setForm({ ...form, photoUrl: url }); }} className="w-full" />
+              </div>
+              <div className="sm:col-span-3 flex justify-end">
+                <button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Add</button>
+              </div>
+            </form>
+            ) : (
+              <div className="text-sm text-gray-700 mb-4">Admin access required to add or remove leadership profiles.</div>
+            )}
+            {list.length === 0 ? (
+              <Empty title="No leadership yet" subtitle="Add leadership members to display here." />
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {list.map(p => (
+                  <div key={p.id} className="rounded border border-slate-200 p-4 bg-white shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <img src={p.photoUrl || avatar('ST')} alt={p.name} className="h-12 w-12 rounded-full object-cover" />
+                      <div>
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-sm text-gray-600">{p.position}</div>
+                      </div>
+                    </div>
+                      <div className="mt-3 flex gap-2">
+                        {isAdmin && <button onClick={() => remove(p.id)} className="px-3 py-1 rounded border border-red-500 text-red-600 hover:bg-red-50">Delete</button>}
+                      </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Page>
+        );
+      }
+
+      function ProjectsPage() {
+        return (
+          <Page title="Projects">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Card title="Ongoing Projects" desc="Active initiatives currently in progress" action={<Link to="/projects/ongoing" className="px-3 py-2 rounded border hover:bg-slate-50">Open</Link>} />
+              <Card title="Pending Projects" desc="Planned projects awaiting start" action={<Link to="/projects/pending" className="px-3 py-2 rounded border hover:bg-slate-50">Open</Link>} />
+              <Card title="Rejected Projects" desc="Projects not approved or discontinued" action={<Link to="/projects/rejected" className="px-3 py-2 rounded border hover:bg-slate-50">Open</Link>} />
+              <Card title="Training" desc="Current trainings and capacity building" action={<Link to="/projects/training" className="px-3 py-2 rounded border hover:bg-slate-50">Open</Link>} />
+            </div>
+          </Page>
+        );
+      }
+
+      function ProjectCategory({ storageKey, title }) {
+        const [items, setItems] = useState([]);
+        const [form, setForm] = useState({ title: '', date: '', desc: '', img: '' });
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        useEffect(() => { setItems(storage.get(storageKey)); }, [storageKey]);
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={`${storageKey}-${name}`}>{name}</label>
+            <input id={`${storageKey}-${name}`} type={type} value={form[name]}
+                   onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+          </div>
+        );
+        const onFile = async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const url = await fileToDataURL(f); setForm({ ...form, img: url }); };
+        const onImportDoc = async (e) => {
+          const f = e.target.files && e.target.files[0];
+          if (!f) return;
+          const url = await fileToDataURL(f);
+          const docItem = { id: uid(), title: f.name, date: new Date().toISOString().slice(0,10), desc: '', img: '', fileUrl: url, filename: f.name, type: f.type, size: f.size };
+          const next = [...items, docItem];
+          setItems(next); storage.set(storageKey, next);
+          e.target.value = '';
+        };
+        const add = (e) => {
+          e && e.preventDefault && e.preventDefault();
+          if (!form.title.trim()) return;
+          const next = [...items, { id: uid(), ...form }];
+          setItems(next); storage.set(storageKey, next);
+          setForm({ title: '', date: '', desc: '', img: '' });
+        };
+        const remove = (id) => { const next = items.filter(i => i.id !== id); setItems(next); storage.set(storageKey, next); };
+        return (
+          <Page title={title} actions={<div className="flex items-center gap-2">{isAdmin ? <>
+            <button onClick={add} className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Add Project</button>
+            <label className="px-3 py-2 rounded border cursor-pointer hover:bg-slate-50" title="Import Word/Excel">
+              Import Document
+              <input type="file" accept=".doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={onImportDoc} />
+            </label>
+          </> : <Link className="px-3 py-2 rounded border hover:bg-slate-50" to="/admin">Login to add</Link>}</div>}>
+            {isAdmin && (
+              <form className="grid sm:grid-cols-3 gap-3 mb-4" onSubmit={add}>
+                {input('title','text','Project title')}
+                {input('date','date','')}
+                {input('desc','text','Short description')}
+                <div className="sm:col-span-3">
+                  <label className="block text-sm font-medium mb-1">Image</label>
+                  <input type="file" accept="image/*" onChange={onFile} className="w-full" />
+                </div>
+                <div className="sm:col-span-3 flex justify-end"><button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Add</button></div>
+              </form>
+            )}
+            {items.length === 0 ? (
+              <Empty title="No items" subtitle="Add projects to display here." />
+            ) : (
+              <div className="grid md:grid-cols-3 gap-4">
+                {items.map(n => (
+                  <div key={n.id} className="group rounded overflow-hidden bg-white border shadow-sm hover:shadow-md transition">
+                    {n.img && <img src={n.img} alt={n.title} className="h-40 w-full object-cover transform transition-transform duration-300 group-hover:scale-105" />}
+                    <div className="p-3">
+                      <div className="font-medium flex items-center gap-2">
+                        {n.fileUrl ? <span className="inline-block w-5 h-5 rounded bg-accent-500 text-white text-xs flex items-center justify-center">DOC</span> : null}
+                        <span>{n.title}</span>
+                      </div>
+                      <div className="text-sm text-gray-600">{n.date}</div>
+                      <div className="text-sm text-gray-700 mt-1">{n.desc}</div>
+                      {n.fileUrl && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <a href={n.fileUrl} target="_blank" rel="noopener" className="px-3 py-1 rounded border hover:bg-slate-50">View</a>
+                          <a href={n.fileUrl} download={n.filename || 'document'} className="px-3 py-1 rounded border hover:bg-slate-50">Download</a>
+                        </div>
+                      )}
+                      {isAdmin && <div className="mt-2"><button onClick={() => remove(n.id)} className="px-3 py-1 rounded border border-red-500 text-red-600 hover:bg-red-50">Delete</button></div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Page>
+        );
+      }
+
+      function ProjectsOngoingPage() { return <ProjectCategory storageKey={'projectsOngoing'} title={'Ongoing Projects'} />; }
+      function ProjectsPendingPage() { return <ProjectCategory storageKey={'projectsPending'} title={'Pending Projects'} />; }
+      function ProjectsRejectedPage() { return <ProjectCategory storageKey={'projectsRejected'} title={'Rejected Projects'} />; }
+      function ProjectsTrainingPage() { return <ProjectCategory storageKey={'projectsTraining'} title={'Training'} />; }
+      // Staff Module
+      function StaffDirectory() {
+        const [staff, setStaff] = useState([]);
+        const [query, setQuery] = useState('');
+        useEffect(() => { setStaff(storage.get('staffRecords')); }, []);
+        const edit = (id) => { location.hash = `/staff/${id}`; };
+        const remove = (id) => { const next = staff.filter(s => s.id !== id); setStaff(next); storage.set('staffRecords', next); };
+        const exportJSON = () => {
+          download('staff.json', 'application/json', JSON.stringify(staff, null, 2));
+        };
+        const exportCSV = () => {
+          const cols = ['id','name','email','department','role','phone','photoUrl'];
+          const csv = toCSV(staff, cols);
+          download('staff.csv', 'text/csv', csv);
+        };
+        const onImport = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const text = await file.text();
+          const data = JSON.parse(text);
+          setStaff(data);
+          storage.set('staffRecords', data);
+          e.target.value = '';
+        };
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        const filtered = useMemo(() => {
+          const q = query.trim().toLowerCase();
+          if (!q) return staff;
+          return staff.filter(s => [s.name, s.email, s.department, s.role, s.phone].some(v => String(v || '').toLowerCase().includes(q)));
+        }, [staff, query]);
+        return (
+          <Page title="Staff Directory" actions={
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search staff…" className="pl-9 w-64 rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">🔎</span>
+              </div>
+              {isAdmin && <Link className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700" to="/staff/new">Add Staff</Link>}
+              <button onClick={exportJSON} className="px-3 py-2 rounded border hover:bg-slate-50">Export JSON</button>
+              <button onClick={exportCSV} className="px-3 py-2 rounded border hover:bg-slate-50">Export CSV</button>
+              <label className="px-3 py-2 rounded border cursor-pointer hover:bg-slate-50" title="Import JSON file">
+                Import JSON
+                <input type="file" accept="application/json,.json" className="hidden" onChange={onImport} />
+              </label>
+              {!isAdmin && <Link className="px-3 py-2 rounded border hover:bg-white/10" to="/admin">Login to edit</Link>}
+            </div>
+          }>
+            {staff.length === 0 ? (
+              <Empty title="No staff yet" subtitle="Add staff profiles to get started." />
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map(s => (
+                  <div key={s.id} className="rounded border border-slate-200 p-4 bg-white shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <img src={s.photoUrl || avatar('UG')} alt={s.name} className="h-12 w-12 rounded-full object-cover" />
+                        <div>
+                          <div className="font-medium">{s.name}</div>
+                          <div className="text-sm text-gray-600">{s.role} • {s.department}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-600">{s.email}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      {isAdmin && <button onClick={() => edit(s.id)} className="px-3 py-1 rounded border hover:bg-slate-50">Edit</button>}
+                      {isAdmin && <button onClick={() => remove(s.id)} className="px-3 py-1 rounded border border-red-500 text-red-600 hover:bg-red-50">Delete</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Page>
+        );
+      }
+
+      function StaffForm({ idParam }) {
+        const navigate = (to) => { location.hash = to; };
+        const isEdit = Boolean(idParam && idParam !== 'new');
+        const [form, setForm] = useState({ name: '', email: '', department: '', role: '', phone: '', photoUrl: '' });
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        useEffect(() => {
+          if (isEdit) {
+            const staff = storage.get('staffRecords');
+            const found = staff.find(s => s.id === idParam);
+            if (found) setForm(found);
+          }
+        }, [isEdit, idParam]);
+        const submit = (e) => {
+          e.preventDefault();
+          const staff = storage.get('staffRecords');
+          if (isEdit) {
+            storage.set('staffRecords', staff.map(s => s.id === idParam ? { ...form } : s));
+          } else {
+            storage.set('staffRecords', [...staff, { id: uid(), ...form }]);
+          }
+          navigate('/staff');
+        };
+        const input = (name, type = 'text', placeholder = '') => (
+          <div>
+            <label className="block text-sm font-medium mb-1 capitalize" htmlFor={name}>{name}</label>
+            <input id={name} type={type} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                   placeholder={placeholder}
+                   className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+          </div>
+        );
+        if (!isAdmin) {
+          return (
+            <Page title={isEdit ? 'Edit Staff Profile' : 'Add Staff Profile'} actions={<Link className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700" to="/admin">Admin Login</Link>}>
+              <div className="text-sm text-gray-700">Admin access required to modify staff profiles.</div>
+            </Page>
+          );
+        }
+        return (
+          <Page title={isEdit ? 'Edit Staff Profile' : 'Add Staff Profile'}>
+            <form className="grid sm:grid-cols-2 gap-4" onSubmit={submit}>
+              {input('name', 'text', 'John Doe')}
+              {input('email', 'email', 'john@university.edu')}
+              {input('department', 'text', 'Computer Science')}
+              {input('role', 'text', 'Lecturer')}
+              {input('phone', 'tel', '+233 200 000 000')}
+              <div>
+                <label className="block text-sm font-medium mb-1">Photo</label>
+                <input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; const url = await fileToDataURL(f); setForm({ ...form, photoUrl: url }); }} className="w-full" />
+              </div>
+              <div className="sm:col-span-2 flex gap-2 justify-end">
+                <Link to="/staff" className="px-4 py-2 rounded border border-slate-300 hover:bg-slate-50">Cancel</Link>
+                <button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Save</button>
+              </div>
+            </form>
+          </Page>
+        );
+      }
+
+      // Leave Module
+      function LeavePage() {
+        const [staff, setStaff] = useState([]);
+        const [requests, setRequests] = useState([]);
+        const [form, setForm] = useState({ staffId: '', type: 'Annual', startDate: '', endDate: '', reason: '' });
+        useEffect(() => { setStaff(storage.get('staffRecords')); setRequests(storage.get('leaveRequests')); }, []);
+        const exportJSON = () => {
+          download('leave.json', 'application/json', JSON.stringify(requests, null, 2));
+        };
+        const exportCSV = () => {
+          const cols = ['id','staffId','type','startDate','endDate','reason','status','createdAt'];
+          const csv = toCSV(requests, cols);
+          download('leave.csv', 'text/csv', csv);
+        };
+        const onImport = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const text = await file.text();
+          const data = JSON.parse(text);
+          setRequests(data);
+          storage.set('leaveRequests', data);
+          e.target.value = '';
+        };
+        const submit = (e) => {
+          e.preventDefault();
+          const next = [...requests, { id: uid(), ...form, status: 'Pending', createdAt: new Date().toISOString() }];
+          setRequests(next); storage.set('leaveRequests', next);
+          setForm({ staffId: '', type: 'Annual', startDate: '', endDate: '', reason: '' });
+        };
+        const setStatus = (id, status) => {
+          const next = requests.map(r => r.id === id ? { ...r, status } : r);
+          setRequests(next); storage.set('leaveRequests', next);
+        };
+        const staffName = (id) => {
+          const s = staff.find(s => s.id === id);
+          return s ? s.name : '—';
+        };
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        return (
+          <Page title="Leave Management">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <div className="font-medium mb-2">Submit a new leave request</div>
+                {isAdmin ? (
+                <form className="space-y-3" onSubmit={submit}>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Staff</label>
+                    <select className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.staffId} onChange={e => setForm({ ...form, staffId: e.target.value })}>
+                      <option value="">Select staff</option>
+                      {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.department})</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Type</label>
+                      <select className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+                        <option>Annual</option>
+                        <option>Sick</option>
+                        <option>Maternity</option>
+                        <option>Unpaid</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Reason</label>
+                      <input className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Optional" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Start Date</label>
+                      <input type="date" className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">End Date</label>
+                      <input type="date" className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Submit</button>
+                  </div>
+                </form>
+                ) : (
+                  <div className="text-sm text-gray-700">Admin access required to submit leave requests.</div>
+                )}
+              </div>
+              <div>
+                <div className="font-medium mb-2">Requests</div>
+                {requests.length === 0 ? (
+                  <Empty title="No leave requests yet" subtitle="Submit a request to see it listed here." />
+                ) : (
+                  <div className="space-y-3">
+                    {requests.map(r => (
+                      <div key={r.id} className="rounded border p-3 bg-white">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{staffName(r.staffId)} <span className="text-sm text-gray-600">• {r.type}</span></div>
+                            <div className="text-sm text-gray-600">{r.startDate} → {r.endDate}</div>
+                          </div>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          {isAdmin && <button onClick={() => setStatus(r.id, 'Approved')} className="px-3 py-1 rounded border border-green-600 text-green-700 hover:bg-green-50">Approve</button>}
+                          {isAdmin && <button onClick={() => setStatus(r.id, 'Declined')} className="px-3 py-1 rounded border border-red-600 text-red-700 hover:bg-red-50">Decline</button>}
+                          {isAdmin && <button onClick={() => setStatus(r.id, 'Pending')} className="px-3 py-1 rounded border hover:bg-slate-50">Reset</button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Page>
+        );
+      }
+
+      function StatusBadge({ status }) {
+        const color = status === 'Approved' ? 'bg-green-100 text-green-700' : status === 'Declined' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-800';
+        return <span className={`px-2 py-1 text-xs rounded ${color}`}>{status}</span>;
+      }
+
+      function Footer() {
+        const [messages, setMessages] = useState([]);
+        const [text, setText] = useState('');
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        useEffect(() => { setMessages(storage.get('feedbackMessages')); }, []);
+        const send = (e) => {
+          if (e && typeof e.preventDefault === 'function') e.preventDefault();
+          if (!text.trim()) return;
+          const next = [...messages, { id: uid(), text: text.trim(), from: isAdmin ? 'admin' : 'user', createdAt: new Date().toISOString() }];
+          setMessages(next); storage.set('feedbackMessages', next); setText('');
+        };
+        return (
+          <footer className="mt-10 bg-army-700 text-white">
+            <div className="mx-auto max-w-6xl px-4 py-8 text-sm">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <div className="font-medium mb-2">About Us</div>
+                  <div className="text-white/90">NATIONAL SECRETARIAT FOR PATRIOTIMS CORPS (NSPC) promotes unity, service and national development through patriotic initiatives and community engagement.</div>
+                </div>
+                <div>
+                  <div className="font-medium mb-2">Contacts</div>
+                  <div className="space-y-1 text-white/90">
+                    <div>Phone: +256 700 000 000</div>
+                    <div>Email: info@nspc.go.ug</div>
+                    <div>Location: State House, Kampala, Uganda</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="font-medium mb-2">Community Chat</div>
+                  <div className="space-y-2 max-h-40 overflow-auto bg-army-800/40 rounded p-2">
+                    {messages.length === 0 ? (
+                      <div className="text-white/80">No messages yet.</div>
+                    ) : (
+                      messages.map(m => (
+                        <div key={m.id} className={`flex ${m.from === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[70%] px-3 py-2 rounded ${m.from === 'admin' ? 'bg-primary-600 text-white' : 'bg-white/20 text-white'}`}>
+                            <div className="text-sm">{m.text}</div>
+                            <div className={`text-[11px] mt-1 ${m.from === 'admin' ? 'text-white/80' : 'text-white/70'}`}>{new Date(m.createdAt).toLocaleString()}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form className="mt-2 flex items-center gap-2" onSubmit={send}>
+                    <input className="flex-1 rounded border px-3 py-2 border-white/30 bg-white/10 text-white placeholder:text-white/70 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400" placeholder={isAdmin ? 'Type admin reply…' : 'Type your message…'} value={text} onChange={e => setText(e.target.value)} />
+                    <button type="submit" className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Send</button>
+                  </form>
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div>© NSPC — NATIONAL SECRETARIAT FOR PATRIOTIMS CORPS</div>
+                <div>Developed by ENG. ALIONI ALFRED</div>
+              </div>
+            </div>
+          </footer>
+        );
+      }
+
+      // App
+      function App() {
+        useEffect(() => {
+          if (!localStorage.getItem('alumniRecords')) storage.set('alumniRecords', []);
+          if (!localStorage.getItem('staffRecords')) storage.set('staffRecords', []);
+          if (!localStorage.getItem('leaveRequests')) storage.set('leaveRequests', []);
+          if (!localStorage.getItem('leadershipRecords')) storage.set('leadershipRecords', []);
+          if (!localStorage.getItem('galleryItems')) storage.set('galleryItems', []);
+          if (!localStorage.getItem('newsItems')) storage.set('newsItems', []);
+          if (!localStorage.getItem('feedbackMessages')) storage.set('feedbackMessages', []);
+          if (!localStorage.getItem('projectsOngoing')) storage.set('projectsOngoing', []);
+          if (!localStorage.getItem('projectsPending')) storage.set('projectsPending', []);
+          if (!localStorage.getItem('projectsRejected')) storage.set('projectsRejected', []);
+          if (!localStorage.getItem('projectsTraining')) storage.set('projectsTraining', []);
+          if (!localStorage.getItem('opportunityLinks')) storage.set('opportunityLinks', [
+            { label: 'Jobs', url: '#' },
+            { label: 'Volunteer', url: '#' },
+            { label: 'Training', url: '#' }
+          ]);
+          if (!localStorage.getItem('projectLinks')) storage.set('projectLinks', [
+            { label: 'Ongoing Projects', url: '#' },
+            { label: 'Ongoing Trainings', url: '#' }
+          ]);
+          if (!localStorage.getItem('isAdmin')) localStorage.setItem('isAdmin','false');
+        }, []);
+        const [route, navigate] = useRoute();
+        let content = null;
+        if (route === '/' || route === '') content = <Home />;
+        else if (route === '/alumni/register') content = <AlumniRegister />;
+        else if (route === '/alumni/list') content = <AlumniList />;
+        else if (route === '/staff') content = <StaffDirectory />;
+        else if (route === '/staff/new') content = <StaffForm idParam={'new'} />;
+        else if (route.startsWith('/staff/')) content = <StaffForm idParam={route.split('/')[2]} />;
+        else if (route === '/leave') content = <LeavePage />;
+        else if (route === '/gallery') content = <GalleryPage />;
+        else if (route === '/news') content = <NewsPage />;
+        else if (route === '/leadership') content = <LeadershipPage />;
+        else if (route === '/projects') content = <ProjectsPage />;
+        else if (route === '/projects/ongoing') content = <ProjectsOngoingPage />;
+        else if (route === '/projects/pending') content = <ProjectsPendingPage />;
+        else if (route === '/projects/rejected') content = <ProjectsRejectedPage />;
+        else if (route === '/projects/training') content = <ProjectsTrainingPage />;
+        else if (route === '/admin') content = <AdminLogin />;
+        else content = (
+          <Page title="Not Found">
+            <p>We couldn't find that page.</p>
+            <div className="mt-3"><Link to="/" className="px-3 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Go Home</Link></div>
+          </Page>
+        );
+        return (
+          <>
+            <Header />
+            {content}
+            <Footer />
+          </>
+        );
+      }
+
+      function AdminLogin() {
+        const [form, setForm] = useState({ username: '', password: '' });
+        const [error, setError] = useState('');
+        const submit = (e) => {
+          e.preventDefault();
+          const valid = form.username === 'Alioni' && form.password === '123456';
+          if (valid) {
+            localStorage.setItem('isAdmin','true');
+            setError('');
+            location.hash = '/staff';
+          } else {
+            setError('Invalid credentials. Please try again.');
+          }
+        };
+        return (
+          <Page title="Admin Login">
+            <form className="max-w-sm space-y-3" onSubmit={submit}>
+              <div>
+                <label className="block text-sm font-medium mb-1">Username</label>
+                <input className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="Alioni" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Password</label>
+                <input type="password" className="w-full rounded border px-3 py-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="123456" />
+              </div>
+              {error && <div className="text-sm text-red-600">{error}</div>}
+              <div className="flex justify-end">
+                <button type="submit" className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700">Login</button>
+              </div>
+            </form>
+          </Page>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+    
+  </body>
+</html>
+
